@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { PanelView } from "@/components/editor/panels/assets/views/base-view";
+import { PanelView } from "@/components/editor/panels/assets/views/base-panel";
 import {
 	Select,
 	SelectContent,
@@ -10,7 +10,6 @@ import {
 import { useState, useRef } from "react";
 import { extractTimelineAudio } from "@/lib/media/mediabunny";
 import { useEditor } from "@/hooks/use-editor";
-import { DEFAULT_TEXT_ELEMENT } from "@/constants/text-constants";
 import {
 	BatchCommand,
 	AddTrackCommand,
@@ -20,7 +19,7 @@ import { TRANSCRIPTION_LANGUAGES } from "@/constants/transcription-constants";
 import type {
 	TranscriptionLanguage,
 	TranscriptionProgress,
-} from "@/types/transcription";
+} from "@/lib/transcription/types";
 import { transcriptionService } from "@/services/transcription/service";
 import { decodeAudioToFloat32 } from "@/lib/media/audio";
 import { buildCaptionChunks } from "@/lib/transcription/caption";
@@ -30,7 +29,8 @@ import {
 	SectionContent,
 	SectionField,
 	SectionFields,
-} from "@/components/editor/panels/properties/section";
+} from "@/components/section";
+import { DEFAULTS } from "@/lib/timeline/defaults";
 
 export function Captions() {
 	const [selectedLanguage, setSelectedLanguage] =
@@ -70,28 +70,32 @@ export function Captions() {
 				onProgress: handleProgress,
 			});
 
-		setProcessingStep("Generating captions...");
-		const captionChunks = buildCaptionChunks({ segments: result.segments });
+			setProcessingStep("Generating captions...");
+			const captionChunks = buildCaptionChunks({ segments: result.segments });
 
-		const addTrackCommand = new AddTrackCommand("text", 0);
-		const insertCommands = captionChunks.map((caption, i) =>
-			new InsertElementCommand({
-				placement: { mode: "explicit", trackId: addTrackCommand.getTrackId() },
-				element: {
-					...DEFAULT_TEXT_ELEMENT,
-					name: `Caption ${i + 1}`,
-					content: caption.text,
-					duration: caption.duration,
-					startTime: caption.startTime,
-					fontSize: 65,
-					fontWeight: "bold",
-				},
-			})
-		);
+			const addTrackCommand = new AddTrackCommand("text", 0);
+			const insertCommands = captionChunks.map(
+				(caption, i) =>
+					new InsertElementCommand({
+						placement: {
+							mode: "explicit",
+							trackId: addTrackCommand.getTrackId(),
+						},
+						element: {
+							...DEFAULTS.text.element,
+							name: `Caption ${i + 1}`,
+							content: caption.text,
+							duration: caption.duration,
+							startTime: caption.startTime,
+							fontSize: 65,
+							fontWeight: "bold",
+						},
+					}),
+			);
 
-		editor.command.execute({
-			command: new BatchCommand([addTrackCommand, ...insertCommands]),
-		});
+			editor.command.execute({
+				command: new BatchCommand([addTrackCommand, ...insertCommands]),
+			});
 		} catch (error) {
 			console.error("Transcription failed:", error);
 			setError(
@@ -117,9 +121,13 @@ export function Captions() {
 	};
 
 	return (
-		<PanelView title="Captions" contentClassName="px-0 flex flex-col h-full" ref={containerRef}>
-			<Section showTopBorder={false} className="flex-1">
-				<SectionContent className="flex flex-col gap-4 h-full">
+		<PanelView
+			title="Captions"
+			contentClassName="px-0 flex flex-col h-full"
+			ref={containerRef}
+		>
+			<Section showTopBorder={false} showBottomBorder={false} className="flex-1">
+				<SectionContent className="flex flex-col gap-4 h-full pt-1">
 					<SectionFields>
 						<SectionField label="Language">
 							<Select
@@ -150,7 +158,7 @@ export function Captions() {
 			</Section>
 			<Section showBottomBorder={false} showTopBorder={false}>
 				<SectionContent>
-				<Button
+					<Button
 						className="w-full"
 						onClick={handleGenerateTranscript}
 						disabled={isProcessing}
@@ -158,8 +166,8 @@ export function Captions() {
 						{isProcessing && <Spinner className="mr-1" />}
 						{isProcessing ? processingStep : "Generate transcript"}
 					</Button>
-					</SectionContent>
-					</Section>
+				</SectionContent>
+			</Section>
 		</PanelView>
 	);
 }
