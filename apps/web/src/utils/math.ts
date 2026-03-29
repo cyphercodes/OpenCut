@@ -166,8 +166,8 @@ function tokenize(input: string): Token[] {
 				numStr += str[i];
 				i++;
 			}
-			const value = Number.parseFloat(numStr);
-			if (Number.isNaN(value)) {
+			const value = Number(numStr);
+			if (!Number.isFinite(value)) {
 				throw new Error(`Invalid number: ${numStr}`);
 			}
 			tokens.push({ type: "NUMBER", value });
