@@ -5,7 +5,7 @@ import { Toaster } from "../components/ui/sonner";
 import { TooltipProvider } from "../components/ui/tooltip";
 import { baseMetaData } from "./metadata";
 import { BotIdClient } from "botid/client";
-import { webEnv } from "@opencut/env/web";
+import { webEnv } from "@/lib/env/web";
 import { Inter } from "next/font/google";
 
 const siteFont = Inter({ subsets: ["latin"] });
@@ -29,11 +29,20 @@ export default function RootLayout({
 			<head>
 				<BotIdClient protect={protectedRoutes} />
 				{process.env.NODE_ENV === "development" && (
-					<Script
-						src="//unpkg.com/react-scan/dist/auto.global.js"
-						crossOrigin="anonymous"
-						strategy="beforeInteractive"
-					/>
+					<>
+						<Script
+							src="//unpkg.com/react-scan/dist/auto.global.js"
+							crossOrigin="anonymous"
+							strategy="beforeInteractive"
+						/>
+
+						{/* code to figma */}
+						{/* <script
+							dangerouslySetInnerHTML={{
+								__html: `(function(){var s=document.createElement('script');s.src='https://mcp.figma.com/mcp/html-to-design/capture.js';document.head.appendChild(s);})();`,
+							}}
+						/> */}
+					</>
 				)}
 			</head>
 			<body className={`${siteFont.className} font-sans antialiased`}>

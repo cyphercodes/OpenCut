@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 import { withBotId } from "botid/next/config";
 import { withContentCollections } from "@content-collections/next";
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
+
+initOpenNextCloudflareForDev();
 
 const nextConfig: NextConfig = {
 	turbopack: {
@@ -50,6 +53,10 @@ const nextConfig: NextConfig = {
 			{
 				protocol: "https",
 				hostname: "api.unisvg.com",
+			},
+			{
+				protocol: "https",
+				hostname: "cdn.brandfetch.io",
 			},
 		],
 	},

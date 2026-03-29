@@ -10,6 +10,41 @@ export function clamp({
 	return Math.max(min, Math.min(max, value));
 }
 
+export function clampRound({
+	value,
+	min,
+	max,
+}: {
+	value: number;
+	min: number;
+	max: number;
+}): number {
+	return Math.round(clamp({ value, min, max }));
+}
+
+export function getFractionDigitsForStep({ step }: { step: number }): number {
+	const normalizedStep = step.toString().toLowerCase();
+	if (normalizedStep.includes("e-")) {
+		return Number(normalizedStep.split("e-")[1] ?? 0);
+	}
+	const [, fractionalPart = ""] = normalizedStep.split(".");
+	return fractionalPart.length;
+}
+
+export function snapToStep({
+	value,
+	step,
+}: {
+	value: number;
+	step: number;
+}): number {
+	if (step <= 0) return value;
+	const snappedValue = Math.round(value / step) * step;
+	return Number(
+		snappedValue.toFixed(getFractionDigitsForStep({ step })),
+	);
+}
+
 export function isNearlyEqual({
 	leftValue,
 	rightValue,
@@ -20,6 +55,47 @@ export function isNearlyEqual({
 	epsilon?: number;
 }): boolean {
 	return Math.abs(leftValue - rightValue) <= epsilon;
+}
+
+export function formatNumberForDisplay({
+	value,
+	fractionDigits,
+	minFractionDigits = 0,
+	maxFractionDigits = 6,
+}: {
+	value: number;
+	fractionDigits?: number;
+	minFractionDigits?: number;
+	maxFractionDigits?: number;
+}): string {
+	const resolvedMaxFractionDigits = Math.max(
+		0,
+		fractionDigits ?? maxFractionDigits,
+	);
+	const resolvedMinFractionDigits = Math.min(
+		Math.max(0, fractionDigits ?? minFractionDigits),
+		resolvedMaxFractionDigits,
+	);
+	const fixedValue = value.toFixed(resolvedMaxFractionDigits);
+
+	if (resolvedMaxFractionDigits === 0) {
+		return Number(fixedValue) === 0 ? "0" : fixedValue;
+	}
+
+	const [integerPart, fractionPart = ""] = fixedValue.split(".");
+	const normalizedIntegerPart = Number(fixedValue) === 0 ? "0" : integerPart;
+	let trimmedFractionPart = fractionPart;
+
+	while (
+		trimmedFractionPart.length > resolvedMinFractionDigits &&
+		trimmedFractionPart.endsWith("0")
+	) {
+		trimmedFractionPart = trimmedFractionPart.slice(0, -1);
+	}
+
+	return trimmedFractionPart
+		? `${normalizedIntegerPart}.${trimmedFractionPart}`
+		: normalizedIntegerPart;
 }
 
 /**
@@ -127,7 +203,6 @@ function parseExpression(input: string): number | null {
 
 	const result = parseExpressionLevel();
 
-	// Ensure all tokens were consumed
 	if (index !== tokens.length) {
 		return null;
 	}
@@ -153,13 +228,11 @@ function tokenize(input: string): Token[] {
 	while (i < str.length) {
 		const char = str[i];
 
-		// Skip whitespace
 		if (/\s/.test(char)) {
 			i++;
 			continue;
 		}
 
-		// Numbers (including decimals)
 		if (/\d/.test(char)) {
 			let numStr = "";
 			while (i < str.length && (/\d/.test(str[i]) || str[i] === ".")) {
@@ -174,7 +247,6 @@ function tokenize(input: string): Token[] {
 			continue;
 		}
 
-		// Operators
 		switch (char) {
 			case "+":
 				tokens.push({ type: "PLUS" });

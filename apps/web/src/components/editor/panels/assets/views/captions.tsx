@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { PanelView } from "@/components/editor/panels/assets/views/base-view";
+import { PanelView } from "@/components/editor/panels/assets/views/base-panel";
 import {
 	Select,
 	SelectContent,
@@ -10,17 +10,30 @@ import {
 import { useState, useRef } from "react";
 import { extractTimelineAudio } from "@/lib/media/mediabunny";
 import { useEditor } from "@/hooks/use-editor";
-import { DEFAULT_TEXT_ELEMENT } from "@/constants/text-constants";
-import { TRANSCRIPTION_LANGUAGES } from "@/constants/transcription-constants";
+import {
+	DEFAULT_TRANSCRIPTION_SAMPLE_RATE,
+	TRANSCRIPTION_LANGUAGES,
+} from "@/constants/transcription-constants";
 import type {
 	TranscriptionLanguage,
 	TranscriptionProgress,
-} from "@/types/transcription";
+} from "@/lib/transcription/types";
 import { transcriptionService } from "@/services/transcription/service";
 import { decodeAudioToFloat32 } from "@/lib/media/audio";
 import { buildCaptionChunks } from "@/lib/transcription/caption";
 import { Spinner } from "@/components/ui/spinner";
-import { Label } from "@/components/ui/label";
+import {
+	Section,
+	SectionContent,
+	SectionField,
+	SectionFields,
+} from "@/components/section";
+import { DEFAULTS } from "@/lib/timeline/defaults";
+import {
+	AddTrackCommand,
+	BatchCommand,
+	InsertElementCommand,
+} from "@/lib/commands";
 
 export function Captions() {
 	const [selectedLanguage, setSelectedLanguage] =
@@ -52,7 +65,10 @@ export function Captions() {
 			});
 
 			setProcessingStep("Preparing audio...");
-			const { samples } = await decodeAudioToFloat32({ audioBlob });
+			const { samples } = await decodeAudioToFloat32({
+				audioBlob,
+				sampleRate: DEFAULT_TRANSCRIPTION_SAMPLE_RATE,
+			});
 
 			const result = await transcriptionService.transcribe({
 				audioData: samples,
@@ -63,26 +79,29 @@ export function Captions() {
 			setProcessingStep("Generating captions...");
 			const captionChunks = buildCaptionChunks({ segments: result.segments });
 
-			const captionTrackId = editor.timeline.addTrack({
-				type: "text",
-				index: 0,
-			});
+			const addTrackCommand = new AddTrackCommand("text", 0);
+			const insertCommands = captionChunks.map(
+				(caption, i) =>
+					new InsertElementCommand({
+						placement: {
+							mode: "explicit",
+							trackId: addTrackCommand.getTrackId(),
+						},
+						element: {
+							...DEFAULTS.text.element,
+							name: `Caption ${i + 1}`,
+							content: caption.text,
+							duration: caption.duration,
+							startTime: caption.startTime,
+							fontSize: 65,
+							fontWeight: "bold",
+						},
+					}),
+			);
 
-			for (let i = 0; i < captionChunks.length; i++) {
-				const caption = captionChunks[i];
-				editor.timeline.insertElement({
-					placement: { mode: "explicit", trackId: captionTrackId },
-					element: {
-						...DEFAULT_TEXT_ELEMENT,
-						name: `Caption ${i + 1}`,
-						content: caption.text,
-						duration: caption.duration,
-						startTime: caption.startTime,
-						fontSize: 65,
-						fontWeight: "bold",
-					},
-				});
-			}
+			editor.command.execute({
+				command: new BatchCommand([addTrackCommand, ...insertCommands]),
+			});
 		} catch (error) {
 			console.error("Transcription failed:", error);
 			setError(
@@ -108,43 +127,53 @@ export function Captions() {
 	};
 
 	return (
-		<PanelView title="Captions" ref={containerRef}>
-			<div className="flex flex-col gap-3">
-				<Label>Language</Label>
-				<Select
-					value={selectedLanguage}
-					onValueChange={(value) => handleLanguageChange({ value })}
-				>
-					<SelectTrigger>
-						<SelectValue placeholder="Select a language" />
-					</SelectTrigger>
-					<SelectContent>
-						<SelectItem value="auto">Auto detect</SelectItem>
-						{TRANSCRIPTION_LANGUAGES.map((language) => (
-							<SelectItem key={language.code} value={language.code}>
-								{language.name}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-			</div>
+		<PanelView
+			title="Captions"
+			contentClassName="px-0 flex flex-col h-full"
+			ref={containerRef}
+		>
+			<Section showTopBorder={false} showBottomBorder={false} className="flex-1">
+				<SectionContent className="flex flex-col gap-4 h-full pt-1">
+					<SectionFields>
+						<SectionField label="Language">
+							<Select
+								value={selectedLanguage}
+								onValueChange={(value) => handleLanguageChange({ value })}
+							>
+								<SelectTrigger>
+									<SelectValue placeholder="Select a language" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="auto">Auto detect</SelectItem>
+									{TRANSCRIPTION_LANGUAGES.map((language) => (
+										<SelectItem key={language.code} value={language.code}>
+											{language.name}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</SectionField>
+					</SectionFields>
 
-			<div className="flex flex-col gap-4">
-				{error && (
-					<div className="bg-destructive/10 border-destructive/20 rounded-md border p-3">
-						<p className="text-destructive text-sm">{error}</p>
-					</div>
-				)}
-
-				<Button
-					className="w-full"
-					onClick={handleGenerateTranscript}
-					disabled={isProcessing}
-				>
-					{isProcessing && <Spinner className="mr-1" />}
-					{isProcessing ? processingStep : "Generate transcript"}
-				</Button>
-			</div>
+					{error && (
+						<div className="bg-destructive/10 border-destructive/20 rounded-md border p-3">
+							<p className="text-destructive text-sm">{error}</p>
+						</div>
+					)}
+				</SectionContent>
+			</Section>
+			<Section showBottomBorder={false} showTopBorder={false}>
+				<SectionContent>
+					<Button
+						className="w-full"
+						onClick={handleGenerateTranscript}
+						disabled={isProcessing}
+					>
+						{isProcessing && <Spinner className="mr-1" />}
+						{isProcessing ? processingStep : "Generate transcript"}
+					</Button>
+				</SectionContent>
+			</Section>
 		</PanelView>
 	);
 }
